@@ -365,7 +365,7 @@ table.res-table td.rate-e { color:#5b21b6; font-weight:700; font-size:15px; back
   <div class="result-section" id="resultSection">
     <div class="warn-msg" id="warnMsg"></div>
     <div class="result-title">추정 결과 <span class="acut-badge" id="acutBadge">A컷 —점</span></div>
-    <div class="cut-grid" id="cutGrid"></div>
+
     <div id="resultBody"></div>
     <div class="ai-note" id="aiNote"></div>
   </div>
@@ -719,20 +719,6 @@ function makeTableHTML(data, activeItems) {
 
 function renderResult(results, best, activeItems, pts, acut, note) {
   // A컷 컷 점수 (best 기준)
-  var cuts = ACTIVE_GRADES.map(function() { return 0; });
-  activeItems.forEach(function(it) {
-    ACTIVE_GRADES.forEach(function(g,j) {
-      cuts[j] += (pts[it.key]||0) * ((best[it.key] && best[it.key][g] || 0) / 100);
-    });
-  });
-
-  var cutClasses = ['a','b','c','d','e'];
-  document.getElementById('cutGrid').innerHTML =
-    ACTIVE_GRADES.map(function(g,i) {
-      return '<div class="cut-item cut-' + (cutClasses[i]||'a') + '">' +
-        '<div class="lbl">' + g + '컷</div>' +
-        '<div class="val">' + cuts[i].toFixed(2) + '<span class="unt">점</span></div></div>';
-    }).join('');
   document.getElementById('acutBadge').textContent = 'A컷 ' + acut.toFixed(2) + '점';
 
   // 후보 탭 생성
@@ -781,13 +767,7 @@ function switchCand(idx) {
         cuts[j] += (pts[it.key]||0) * ((cand.result[it.key] && cand.result[it.key][g] || 0) / 100);
       });
     });
-    var cutCls2 = ['a','b','c','d','e'];
-    document.getElementById('cutGrid').innerHTML =
-      ACTIVE_GRADES.map(function(g,i) {
-        return '<div class="cut-item cut-' + (cutCls2[i]||'a') + '">' +
-          '<div class="lbl">' + g + '컷</div>' +
-          '<div class="val">' + cuts[i].toFixed(2) + '<span class="unt">점</span></div></div>';
-      }).join('');
+
     document.getElementById('acutBadge').textContent = 'A컷 ' + cand.acut.toFixed(2) + '점';
   }
 }
