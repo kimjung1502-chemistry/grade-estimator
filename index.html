@@ -180,6 +180,7 @@ h1 { font-size: 20px; font-weight: 700; color: #1F3864; margin-bottom: 4px; }
 .cut-b { background:#F0FDF4; color:#166534; }
 .cut-c { background:#FFFBEB; color:#92400e; }
 .cut-d { background:#FEF2F2; color:#991b1b; }
+.cut-e { background:#F3E8FF; color:#5b21b6; }
 table.res-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
 table.res-table th { padding: 9px 10px; text-align: center; font-weight: 600; font-size: 12px; border-bottom: 2px solid #e5e7eb; }
 table.res-table th.col-head { background: #F9FAFB; color: #374151; }
@@ -213,12 +214,49 @@ table.res-table td.rate-d { color:#991b1b; font-weight:700; font-size:15px; back
 .cand-tab:hover:not(.active) { border-color: #9CA3AF; color: #374151; }
 .cand-pane { display: none; }
 .cand-pane.active { display: block; }
+
+/* 과목 유형 선택 */
+.subject-type-row {
+  display: flex; align-items: center; gap: 12px;
+  background: #F9FAFB; border: 1px solid #E5E7EB;
+  border-radius: 10px; padding: 10px 16px; margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.subject-type-label {
+  font-size: 12px; font-weight: 700; color: #374151; white-space: nowrap;
+}
+.subject-type-btns { display: flex; gap: 8px; }
+.type-btn {
+  padding: 5px 16px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid #D1D5DB; border-radius: 20px;
+  background: #fff; color: #6b7280; cursor: pointer; transition: all 0.15s;
+}
+.type-btn.active {
+  background: #1F3864; border-color: #1F3864; color: #fff;
+}
+.type-btn:hover:not(.active) { border-color: #9CA3AF; color: #374151; }
+.subject-type-hint {
+  font-size: 11px; color: #9CA3AF; margin-left: auto;
+}
+/* E등급 열 */
+th.grade-e { color: #5b21b6; background: #F3E8FF; }
+table.res-table td.rate-e { color:#5b21b6; font-weight:700; font-size:15px; background:#F3E8FF; }
 </style>
 </head>
 <body>
 <div class="card">
   <h1>📊 추정 분할 점수 등급 추정기</h1>
   <p class="subtitle">배점을 설정하고 희망 A컷 점수를 입력하면 조건에 맞는 등급별 분할 점수를 자동으로 계산합니다</p>
+
+  <!-- 과목 유형 선택 -->
+  <div class="subject-type-row">
+    <span class="subject-type-label">과목 유형</span>
+    <div class="subject-type-btns">
+      <button class="type-btn active" id="btn-elective" onclick="setSubjectType('elective')">선택과목 (A~D)</button>
+      <button class="type-btn" id="btn-common" onclick="setSubjectType('common')">공통과목 (A~E)</button>
+    </div>
+    <span class="subject-type-hint" id="subject-hint">인접 등급 간격 &lt; 20%</span>
+  </div>
 
   <!-- 탭 -->
   <div class="tabs">
@@ -340,6 +378,21 @@ const DIFF_LABELS = { easy:'쉬움', mid:'보통', hard:'어려움' };
 const DIFF_BADGE  = { easy:'badge-easy', mid:'badge-mid', hard:'badge-hard' };
 const RATE_CLS    = ['rate-a','rate-b','rate-c','rate-d'];
 const GRADES      = ['A','B','C','D'];
+var SUBJECT_TYPE = 'elective'; // 'elective'(A~D) or 'common'(A~E)
+var ACTIVE_GRADES = ['A','B','C','D'];
+
+function setSubjectType(type) {
+  SUBJECT_TYPE = type;
+  ACTIVE_GRADES = type === 'common' ? ['A','B','C','D','E'] : ['A','B','C','D'];
+  document.getElementById('btn-elective').classList.toggle('active', type === 'elective');
+  document.getElementById('btn-common').classList.toggle('active', type === 'common');
+  document.getElementById('subject-hint').textContent =
+    type === 'common'
+      ? '인접 등급 간격 < 20% · E등급 포함'
+      : '인접 등급 간격 < 20%';
+  // 결과 초기화
+  document.getElementById('resultSection').style.display = 'none';
+}
 const INPUT_IDS   = ['sel_easy','sel_mid','sel_hard','seo_easy','seo_mid','seo_hard'];
 const DIFF_MAP    = {
   '쉬움':'easy','쉬움(하)':'easy','하':'easy',
@@ -478,13 +531,14 @@ INPUT_IDS.forEach(function(id) {
 
 // ── 브루트포스 탐색 ───────────────────────────────────
 function autoLower(a) {
-  var b = Math.max(5, a-10), c = Math.max(5, b-15), d = Math.max(5, c-15);
-  return {A:a, B:b, C:c, D:d};
+  var b = Math.max(30, a-10), c = Math.max(30, b-15), d = Math.max(30, c-15);
+  var e = Math.max(30, d-15);
+  return {A:a, B:b, C:c, D:d, E:e};
 }
 
 function horizOk(abcd) {
-  for (var i = 0; i < 3; i++) {
-    var gap = abcd[GRADES[i]] - abcd[GRADES[i+1]];
+  for (var i = 0; i < ACTIVE_GRADES.length - 1; i++) {
+    var gap = abcd[ACTIVE_GRADES[i]] - abcd[ACTIVE_GRADES[i+1]];
     if (gap <= 0 || gap >= 20) return false;
   }
   return true;
@@ -509,7 +563,7 @@ function bruteforce(activeItems, target) {
   var selGroup = activeItems.filter(function(it) { return it.sec === '선택형'; });
   var seoGroup = activeItems.filter(function(it) { return it.sec === '서답형'; });
   var cands = [];
-  for (var v = 5; v <= 95; v += 5) cands.push(v);
+  for (var v = 30; v <= 95; v += 5) cands.push(v);
 
   // ±3점 범위 내 후보를 최대 5개 수집
   var RANGE = 3;
@@ -525,7 +579,7 @@ function bruteforce(activeItems, target) {
       var d = Math.abs(sum - target);
       if (d > RANGE) return;
       // 중복 제거: 동일한 A값 조합인지 체크
-      var key = activeItems.map(function(it) { return vals[it.key].A; }).join(',');
+      var key = activeItems.map(function(it) { return ACTIVE_GRADES.map(function(g){return vals[it.key][g];}).join('-'); }).join(',');
       for (var ci = 0; ci < candidates.length; ci++) {
         if (candidates[ci].key === key) return;
       }
@@ -651,8 +705,9 @@ function makeTableHTML(data, activeItems) {
     if (!si.length) return;
     si.forEach(function(item, idx) {
       var sc = idx === 0 ? '<td class="sec-cell" rowspan="' + si.length + '">' + sec + '</td>' : '';
-      var rc = GRADES.map(function(g,gi) {
-        return '<td class="' + RATE_CLS[gi] + '">' + (data[item.key] && data[item.key][g] !== undefined ? data[item.key][g] : '—') + '</td>';
+      var rateCls = ['rate-a','rate-b','rate-c','rate-d','rate-e'];
+      var rc = ACTIVE_GRADES.map(function(g,gi) {
+        return '<td class="' + (rateCls[gi]||'rate-a') + '">' + (data[item.key] && data[item.key][g] !== undefined ? data[item.key][g] : '—') + '</td>';
       }).join('');
       html += '<tr>' + sc +
         '<td><span class="diff-badge ' + DIFF_BADGE[item.diff] + '" style="font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;">' + DIFF_LABELS[item.diff] + '</span></td>' +
@@ -664,17 +719,18 @@ function makeTableHTML(data, activeItems) {
 
 function renderResult(results, best, activeItems, pts, acut, note) {
   // A컷 컷 점수 (best 기준)
-  var cuts = [0,0,0,0];
+  var cuts = ACTIVE_GRADES.map(function() { return 0; });
   activeItems.forEach(function(it) {
-    GRADES.forEach(function(g,j) {
+    ACTIVE_GRADES.forEach(function(g,j) {
       cuts[j] += (pts[it.key]||0) * ((best[it.key] && best[it.key][g] || 0) / 100);
     });
   });
 
+  var cutClasses = ['a','b','c','d','e'];
   document.getElementById('cutGrid').innerHTML =
-    ['A컷','B컷','C컷','D컷'].map(function(lbl,i) {
-      return '<div class="cut-item cut-' + ['a','b','c','d'][i] + '">' +
-        '<div class="lbl">' + lbl + '</div>' +
+    ACTIVE_GRADES.map(function(g,i) {
+      return '<div class="cut-item cut-' + (cutClasses[i]||'a') + '">' +
+        '<div class="lbl">' + g + '컷</div>' +
         '<div class="val">' + cuts[i].toFixed(2) + '<span class="unt">점</span></div></div>';
     }).join('');
   document.getElementById('acutBadge').textContent = 'A컷 ' + acut.toFixed(2) + '점';
@@ -695,8 +751,10 @@ function renderResult(results, best, activeItems, pts, acut, note) {
     tablesHtml += '<th class="col-head" style="width:70px">구분</th>';
     tablesHtml += '<th class="col-head" style="width:70px">난이도</th>';
     tablesHtml += '<th class="col-head" style="width:70px">배점합</th>';
-    tablesHtml += '<th class="grade-a">A (%)</th><th class="grade-b">B (%)</th>';
-    tablesHtml += '<th class="grade-c">C (%)</th><th class="grade-d">D (%)</th>';
+    var gradeThCls = ['grade-a','grade-b','grade-c','grade-d','grade-e'];
+    ACTIVE_GRADES.forEach(function(g,gi) {
+      tablesHtml += '<th class="' + (gradeThCls[gi]||'grade-a') + '">' + g + ' (%)</th>';
+    });
     tablesHtml += '</tr></thead><tbody>';
     tablesHtml += makeTableHTML(cand.result, activeItems);
     tablesHtml += '</tbody></table></div>';
@@ -717,16 +775,17 @@ function switchCand(idx) {
     var cand = window._lastRenderState.results[idx];
     var activeItems = window._lastRenderState.activeItems;
     var pts = window._lastRenderState.pts;
-    var cuts = [0,0,0,0];
+    var cuts = ACTIVE_GRADES.map(function() { return 0; });
     activeItems.forEach(function(it) {
-      GRADES.forEach(function(g,j) {
+      ACTIVE_GRADES.forEach(function(g,j) {
         cuts[j] += (pts[it.key]||0) * ((cand.result[it.key] && cand.result[it.key][g] || 0) / 100);
       });
     });
+    var cutCls2 = ['a','b','c','d','e'];
     document.getElementById('cutGrid').innerHTML =
-      ['A컷','B컷','C컷','D컷'].map(function(lbl,i) {
-        return '<div class="cut-item cut-' + ['a','b','c','d'][i] + '">' +
-          '<div class="lbl">' + lbl + '</div>' +
+      ACTIVE_GRADES.map(function(g,i) {
+        return '<div class="cut-item cut-' + (cutCls2[i]||'a') + '">' +
+          '<div class="lbl">' + g + '컷</div>' +
           '<div class="val">' + cuts[i].toFixed(2) + '<span class="unt">점</span></div></div>';
       }).join('');
     document.getElementById('acutBadge').textContent = 'A컷 ' + cand.acut.toFixed(2) + '점';
